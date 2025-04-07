@@ -1,3 +1,7 @@
+// Author: Jadon Meredith
+// Date: 4/7/2025
+// Description: Test code for the LCD screen
+
 #include <U8g2lib.h>
 
 #define LEFT_BUTTON_PIN 53
