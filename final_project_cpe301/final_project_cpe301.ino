@@ -133,6 +133,9 @@ int score = 0;
 unsigned int freq = 0;
 unsigned long previousMillis = millis();
 unsigned int currentNote = 0;
+unsigned int gameDelay = 600;
+unsigned int totalRowsCleared = 0;
+unsigned int level = 1;
 
 void setup() {
   pinMode(LEFT_BUTTON_PIN, INPUT);
@@ -150,7 +153,7 @@ void setup() {
 
 void loop() {
   unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis > 300) {
+  if (currentMillis - previousMillis > (gameDelay / level)) {
     u8g2.firstPage();
     do {
       // Set up borders
@@ -204,6 +207,11 @@ void loop() {
         gameOver = true;
       } else {
         int rowsCleared = clearRows(grid, block);
+        totalRowsCleared += rowsCleared;
+        // Increase level if enough total rows are cleared
+        if (rowsCleared != 0 && totalRowsCleared % 2 == 0) {
+          level += 1;
+        }
         score += getScore(rowsCleared);
         block = BLOCKS[random(0, 7)];
         block = insertBlock(grid, block);
@@ -213,7 +221,9 @@ void loop() {
     previousMillis = currentMillis;
   }
 
-  playTetrisTheme();
+  if (gameOver == false) {
+    playTetrisTheme();
+  }
 }
 
 Vector transformVector(Matrix mat, Vector vec) {
@@ -512,9 +522,9 @@ void myDelay(unsigned int freq) {
 // -------------------------------------------------------
 void playTetrisTheme() {
   // Named duration variables
-  int qu  = 300;  // "quarter" note in ms
-  int eth = 150;  // "eighth" note in ms
-  int hn = 600; // "halfnote" note in ms
+  int qu  = 300 / level;  // "quarter" note in ms
+  int eth = 150 / level;  // "eighth" note in ms
+  int hn = 600 / level; // "halfnote" note in ms
 
   // Example snippet of Tetris (Korobeiniki) theme
   // Feel free to expand the arrays for a longer melody
@@ -747,4 +757,3 @@ unsigned int adc_read(unsigned char adc_channel_num) {
   unsigned int val = *my_ADC_DATA;
   return val;
 }
-
