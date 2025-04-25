@@ -9,6 +9,12 @@
 #define RIGHT_BUTTON_PIN 51
 #define ROTATE_BUTTON_PIN 49
 #define DROP_BUTTON_PIN 47
+#define PAUSE_BUTTON_PIN 2 
+#define UNPAUSE_BUTTON_PIN 3 
+
+volatile bool isPaused = false;
+volatile bool pauseRequested = false;
+volatile bool unpauseRequested = false;
 
 // Registers
 
@@ -149,24 +155,43 @@ void setup() {
   randomSeed(adc_read(0));
   block = BLOCKS[random(0, 7)];
   block = insertBlock(grid, block);
+
+  pinMode(PAUSE_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(UNPAUSE_BUTTON_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(PAUSE_BUTTON_PIN), pauseISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(UNPAUSE_BUTTON_PIN), unpauseISR, FALLING);
 }
 
 void loop() {
+   if (pauseRequested) {
+    isPaused = true;
+    pauseRequested = false;
+  }
+
+  if (unpauseRequested) {
+    isPaused = false;
+    unpauseRequested = false;
+  }
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis > (gameDelay / level)) {
     u8g2.firstPage();
     do {
-      // Set up borders
-      u8g2.drawBox(0, 0, 2, 128);
-      u8g2.drawBox(0, 0, 64, 4);
-      u8g2.drawBox(62, 0, 2, 128);
-      u8g2.drawBox(0, 124, 64, 4);
+      if (isPaused){
+        u8g2.setFont(u8g2_font_bpixel_tr);
+        u8g2.drawStr(20, 30, "PAUSED");
+      } else {
+        // Draw borders
+        u8g2.drawBox(0, 0, 2, 128);
+        u8g2.drawBox(0, 0, 64, 4);
+        u8g2.drawBox(62, 0, 2, 128);
+        u8g2.drawBox(0, 124, 64, 4);
 
-      // Draw out every tetris block currently in grid
-      for (int i = 0; i < 20; i++) {
-        for (int j = 0; j < 10; j++) {
-          if (grid[i][j] == true) {
-            u8g2.drawBox(j*BLOCK_SIZE + 2, i*BLOCK_SIZE + 4, BLOCK_SIZE, BLOCK_SIZE);
+        // Draw all blocks in the grid
+        for (int i = 0; i < 20; i++) {
+          for (int j = 0; j < 10; j++) {
+            if (grid[i][j] == true) {
+              u8g2.drawBox(j * BLOCK_SIZE + 2, i * BLOCK_SIZE + 4, BLOCK_SIZE, BLOCK_SIZE);
+            }
           }
         }
       }
@@ -221,7 +246,7 @@ void loop() {
     previousMillis = currentMillis;
   }
 
-  if (gameOver == false) {
+  if (gameOver == false && isPaused == false) {
     playTetrisTheme();
   }
 }
@@ -756,4 +781,11 @@ unsigned int adc_read(unsigned char adc_channel_num) {
   // return the result in the ADC data register and format the data based on right justification 
   unsigned int val = *my_ADC_DATA;
   return val;
+}
+void pauseISR() {
+  pauseRequested = true;
+}
+
+void unpauseISR() {
+  unpauseRequested = true;
 }
