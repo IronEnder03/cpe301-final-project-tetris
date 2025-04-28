@@ -11,10 +11,12 @@
 #define DROP_BUTTON_PIN 47
 #define PAUSE_BUTTON_PIN 2 
 #define UNPAUSE_BUTTON_PIN 3 
+#define RESET_BUTTON_PIN 19
 
 volatile bool isPaused = false;
 volatile bool pauseRequested = false;
 volatile bool unpauseRequested = false;
+volatile bool resetRequested = false;
 
 // Registers
 
@@ -156,97 +158,116 @@ void setup() {
   block = BLOCKS[random(0, 7)];
   block = insertBlock(grid, block);
 
-  pinMode(PAUSE_BUTTON_PIN, INPUT_PULLUP);
-  pinMode(UNPAUSE_BUTTON_PIN, INPUT_PULLUP);
+  //Pause button
+  DDRD &= ~(1 << 2);    // Set PD2 as INPUT
+  PORTD |= (1 << 2);    // Enable pull-up resistor
+
+  //Unpause button
+  DDRD &= ~(1 << 3);
+  PORTD |= (1 << 3);
+
+  //Reset button
+  DDRE &= ~(1 << 3);
+  PORTE |= (1 << 3);
+
   attachInterrupt(digitalPinToInterrupt(PAUSE_BUTTON_PIN), pauseISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(UNPAUSE_BUTTON_PIN), unpauseISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(RESET_BUTTON_PIN), resetISR, FALLING);
+
 }
 
 void loop() {
-   if (pauseRequested) {
+  if (pauseRequested) 
+  {
     isPaused = true;
     pauseRequested = false;
   }
 
-  if (unpauseRequested) {
+  if (unpauseRequested) 
+  {
     isPaused = false;
     unpauseRequested = false;
   }
+  if (resetRequested) 
+  {
+  resetRequested = false;
+  resetGame();
+  }
+
   unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis > (gameDelay / level)) {
-    u8g2.firstPage();
-    do {
-      if (isPaused){
-        u8g2.setFont(u8g2_font_bpixel_tr);
-        u8g2.drawStr(20, 30, "PAUSED");
-      } else {
-        // Draw borders
-        u8g2.drawBox(0, 0, 2, 128);
-        u8g2.drawBox(0, 0, 64, 4);
-        u8g2.drawBox(62, 0, 2, 128);
-        u8g2.drawBox(0, 124, 64, 4);
+  if (!isPaused && currentMillis - previousMillis > (gameDelay / level)) {
 
-        // Draw all blocks in the grid
-        for (int i = 0; i < 20; i++) {
-          for (int j = 0; j < 10; j++) {
-            if (grid[i][j] == true) {
-              u8g2.drawBox(j * BLOCK_SIZE + 2, i * BLOCK_SIZE + 4, BLOCK_SIZE, BLOCK_SIZE);
-            }
-          }
-        }
-      }
-
-      if (gameOver == true) {
-        clearGrid(grid);
-        u8g2.setFont(u8g2_font_bpixel_tr);
-        u8g2.drawStr(5, 30, "Game Over!");
-        u8g2.setFont(u8g2_font_squeezed_b6_tr);
-        char scoreStr[10];
-        itoa(score, scoreStr, 10);
-        u8g2.drawStr(5, 40, "Score:");
-        u8g2.drawStr(38, 40, scoreStr);
-      }
-    } while (u8g2.nextPage());
-
-    if (gameOver == false) {
-      // Controls
-      if (digitalRead(LEFT_BUTTON_PIN) == HIGH && canMoveLeft(grid, block)) {
-        block = translateBlock(grid, block, -1, 0);
-      }
-      else if (digitalRead(RIGHT_BUTTON_PIN) == HIGH && canMoveRight(grid, block)) {
-        block = translateBlock(grid, block, 1, 0);
-      }
-      else if (digitalRead(ROTATE_BUTTON_PIN) == HIGH && canRotate(grid, block)) {
-        block = rotateBlock(grid, block);
-      }
-      else if (digitalRead(DROP_BUTTON_PIN) == HIGH) {
-        block = dropBlock(grid, block);
-        blockMoves++;
-      }
-      
-      // Move block down and check game over and if new block is needed
-      if (canMoveDown(grid, block)) {
-        block = translateBlock(grid, block, 0, 1);
-        blockMoves++;
-      } else if (blockMoves == 0) {
-        gameOver = true;
-      } else {
-        int rowsCleared = clearRows(grid, block);
-        totalRowsCleared += rowsCleared;
-        // Increase level if enough total rows are cleared
-        if (rowsCleared != 0 && totalRowsCleared % 2 == 0) {
-          level += 1;
-        }
-        score += getScore(rowsCleared);
-        block = BLOCKS[random(0, 7)];
-        block = insertBlock(grid, block);
-        blockMoves = 0;
-      }
+    if (digitalRead(LEFT_BUTTON_PIN) == HIGH && canMoveLeft(grid, block)) {
+      block = translateBlock(grid, block, -1, 0);
     }
+    else if (digitalRead(RIGHT_BUTTON_PIN) == HIGH && canMoveRight(grid, block)) {
+      block = translateBlock(grid, block, 1, 0);
+    }
+    else if (digitalRead(ROTATE_BUTTON_PIN) == HIGH && canRotate(grid, block)) {
+      block = rotateBlock(grid, block);
+    }
+    else if (digitalRead(DROP_BUTTON_PIN) == HIGH) {
+      block = dropBlock(grid, block);
+      blockMoves++;
+    }
+
+    // Move block down and check game over and if new block is needed
+    if (canMoveDown(grid, block)) {
+      block = translateBlock(grid, block, 0, 1);
+      blockMoves++;
+    } else if (blockMoves == 0) {
+      gameOver = true;
+    } else {
+      int rowsCleared = clearRows(grid, block);
+      totalRowsCleared += rowsCleared;
+      if (rowsCleared != 0 && totalRowsCleared % 2 == 0) {
+        level += 1;
+      }
+      score += getScore(rowsCleared);
+      block = BLOCKS[random(0, 7)];
+      block = insertBlock(grid, block);
+      blockMoves = 0;
+    }
+
     previousMillis = currentMillis;
   }
 
-  if (gameOver == false && isPaused == false) {
+  //
+  u8g2.firstPage();
+  do {
+    if (isPaused) {
+      u8g2.setFont(u8g2_font_bpixel_tr);
+      u8g2.drawStr(20, 30, "PAUSED");
+    } else {
+      // Draw borders
+      u8g2.drawBox(0, 0, 2, 128);
+      u8g2.drawBox(0, 0, 64, 4);
+      u8g2.drawBox(62, 0, 2, 128);
+      u8g2.drawBox(0, 124, 64, 4);
+
+      // Draw blocks
+      for (int i = 0; i < 20; i++) {
+        for (int j = 0; j < 10; j++) {
+          if (grid[i][j]) {
+            u8g2.drawBox(j * BLOCK_SIZE + 2, i * BLOCK_SIZE + 4, BLOCK_SIZE, BLOCK_SIZE);
+          }
+        }
+      }
+    }
+
+    if (gameOver) {
+      clearGrid(grid);
+      u8g2.setFont(u8g2_font_bpixel_tr);
+      u8g2.drawStr(5, 30, "Game Over!");
+      u8g2.setFont(u8g2_font_squeezed_b6_tr);
+      char scoreStr[10];
+      itoa(score, scoreStr, 10);
+      u8g2.drawStr(5, 40, "Score:");
+      u8g2.drawStr(38, 40, scoreStr);
+    }
+  } while (u8g2.nextPage());
+
+  if (!isPaused && !gameOver) {
     playTetrisTheme();
   }
 }
@@ -782,10 +803,31 @@ unsigned int adc_read(unsigned char adc_channel_num) {
   unsigned int val = *my_ADC_DATA;
   return val;
 }
-void pauseISR() {
+
+void resetGame() 
+{
+  clearGrid(grid); 
+  block = BLOCKS[random(0, 7)];
+  block = insertBlock(grid, block);
+  blockMoves = 0;
+  totalRowsCleared = 0;
+  level = 1;
+  score = 0;
+  gameOver = false;
+  isPaused = false;
+  previousMillis = millis(); 
+}
+
+void pauseISR() 
+{
   pauseRequested = true;
 }
 
-void unpauseISR() {
+void unpauseISR() 
+{
   unpauseRequested = true;
+}
+void resetISR() 
+{
+  resetRequested = true;
 }
