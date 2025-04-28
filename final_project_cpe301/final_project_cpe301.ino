@@ -13,6 +13,8 @@
 #define UNPAUSE_BUTTON_PIN 3 
 #define RESET_BUTTON_PIN 19
 
+// Pause and reset values
+
 volatile bool isPaused = false;
 volatile bool pauseRequested = false;
 volatile bool unpauseRequested = false;
@@ -96,6 +98,7 @@ bool canRotate(bool grid[20][10], TetrisBlock block);
 void clearGrid(bool grid[20][10]);
 int clearRows(bool grid[20][10], TetrisBlock block);
 int getScore(int rowsCleared);
+void resetGame();
 
 // Delay and buzzer functions
 void myDelay(unsigned int freq);
@@ -110,6 +113,11 @@ void U0putchar(unsigned char U0pdata);
 // ADC functions
 void adc_init();
 unsigned int adc_read(unsigned char adc_channel_num);
+
+// ISR functions
+void pauseISR();
+void unpauseISR();
+void resetISR();
 
 const TetrisBlock BLOCKS[7] = {TETRIS_BLOCK1, TETRIS_BLOCK2, TETRIS_BLOCK3, TETRIS_BLOCK4, TETRIS_BLOCK5, TETRIS_BLOCK6, TETRIS_BLOCK7};
 
@@ -177,6 +185,7 @@ void setup() {
 }
 
 void loop() {
+  // Changes flag variables based on state of ISR variables
   if (pauseRequested) 
   {
     isPaused = true;
@@ -194,6 +203,7 @@ void loop() {
   resetGame();
   }
 
+  // Main game loop with delay
   unsigned long currentMillis = millis();
   if (!isPaused && currentMillis - previousMillis > (gameDelay / level)) {
 
@@ -232,7 +242,7 @@ void loop() {
     previousMillis = currentMillis;
   }
 
-  //
+  // Draw to LCD
   u8g2.firstPage();
   do {
     if (isPaused) {
