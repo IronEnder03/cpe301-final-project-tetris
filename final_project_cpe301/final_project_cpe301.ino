@@ -9,22 +9,37 @@
 #define RIGHT_BUTTON_PIN 51
 #define ROTATE_BUTTON_PIN 49
 #define DROP_BUTTON_PIN 47
-#define PAUSE_BUTTON_PIN 2 
-#define UNPAUSE_BUTTON_PIN 3 
-#define RESET_BUTTON_PIN 19
 
-// Pause and reset values
+#define PAUSE_BUTTON_PIN    0x02 //2
+#define UNPAUSE_BUTTON_PIN  0x03 //Pin 3
+#define RESET_BUTTON_PIN    0x13 //Pin 19
+
+
+#define PAUSE_BUTTON_BIT    (1 << 2)
+#define UNPAUSE_BUTTON_BIT  (1 << 3) 
+#define RESET_BUTTON_BIT    (1 << 2) 
+
 
 volatile bool isPaused = false;
 volatile bool pauseRequested = false;
 volatile bool unpauseRequested = false;
 volatile bool resetRequested = false;
+unsigned int darknessThreshold = 200;
 
 // Registers
 
 // Digital Pin Registers
+volatile unsigned char *portDDRD = (unsigned char *) 0x2A;
+volatile unsigned char *portD    = (unsigned char *) 0x2B;
+volatile unsigned char *pinD     = (unsigned char *) 0x29;
+
+volatile unsigned char *portDDRE = (unsigned char *) 0x2D;
+volatile unsigned char *portE    = (unsigned char *) 0x2E;
+volatile unsigned char *pinE     = (unsigned char *) 0x2C;
+
 volatile unsigned char *portDDRB = (unsigned char *) 0x24;
 volatile unsigned char *portB    = (unsigned char *) 0x25;
+volatile unsigned char *pinB     = (unsigned char *) 0x23;
 
 // Timer Registers
 volatile unsigned char *myTCCR1A = (unsigned char *) 0x80;
@@ -44,7 +59,7 @@ volatile unsigned char *myUCSR0C = (unsigned char *)0x00C2;
 volatile unsigned int  *myUBRR0  = (unsigned int *) 0x00C4;
 volatile unsigned char *myUDR0   = (unsigned char *)0x00C6;
  
-// ADC Registers
+//ADC Registers
 volatile unsigned char* my_ADMUX = (unsigned char*) 0x7C;
 volatile unsigned char* my_ADCSRB = (unsigned char*) 0x7B;
 volatile unsigned char* my_ADCSRA = (unsigned char*) 0x7A;
@@ -98,7 +113,6 @@ bool canRotate(bool grid[20][10], TetrisBlock block);
 void clearGrid(bool grid[20][10]);
 int clearRows(bool grid[20][10], TetrisBlock block);
 int getScore(int rowsCleared);
-void resetGame();
 
 // Delay and buzzer functions
 void myDelay(unsigned int freq);
@@ -113,11 +127,6 @@ void U0putchar(unsigned char U0pdata);
 // ADC functions
 void adc_init();
 unsigned int adc_read(unsigned char adc_channel_num);
-
-// ISR functions
-void pauseISR();
-void unpauseISR();
-void resetISR();
 
 const TetrisBlock BLOCKS[7] = {TETRIS_BLOCK1, TETRIS_BLOCK2, TETRIS_BLOCK3, TETRIS_BLOCK4, TETRIS_BLOCK5, TETRIS_BLOCK6, TETRIS_BLOCK7};
 
@@ -158,52 +167,65 @@ void setup() {
   pinMode(RIGHT_BUTTON_PIN, INPUT);
   pinMode(ROTATE_BUTTON_PIN, INPUT);
   pinMode(DROP_BUTTON_PIN, INPUT);
-  *portDDRB |= 0x40; // Set PB6 as OUTPUT
+
+  *portDDRB |= (1 << 6);  // Same as 0x40
+
   u8g2.begin();
   U0init(9600);
   adc_init();
   randomSeed(adc_read(0));
+  
   block = BLOCKS[random(0, 7)];
   block = insertBlock(grid, block);
 
-  //Pause button
-  DDRD &= ~(1 << 2);    // Set PD2 as INPUT
-  PORTD |= (1 << 2);    // Enable pull-up resistor
+  *portDDRD &= ~(PAUSE_BUTTON_BIT | UNPAUSE_BUTTON_BIT);
+  *portDDRE &= ~(RESET_BUTTON_BIT);                 
 
-  //Unpause button
-  DDRD &= ~(1 << 3);
-  PORTD |= (1 << 3);
-
-  //Reset button
-  DDRE &= ~(1 << 3);
-  PORTE |= (1 << 3);
+  *portD |= (PAUSE_BUTTON_BIT | UNPAUSE_BUTTON_BIT);
+  *portE |= (RESET_BUTTON_BIT);
 
   attachInterrupt(digitalPinToInterrupt(PAUSE_BUTTON_PIN), pauseISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(UNPAUSE_BUTTON_PIN), unpauseISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(RESET_BUTTON_PIN), resetISR, FALLING);
-
 }
 
+bool pausedByDark = false;
+
 void loop() {
-  // Changes flag variables based on state of ISR variables
+
+  unsigned int sensor_value = adc_read(1);
+  Serial.println(sensor_value);
+  bool isDark = (sensor_value < darknessThreshold);
+
+  if (isDark && !isPaused) 
+  {
+    isPaused = true;
+    pausedByDark = true;
+  }else if(!isDark && pausedByDark) 
+  {
+    isPaused = false;
+    pausedByDark = false;
+  }
   if (pauseRequested) 
   {
     isPaused = true;
     pauseRequested = false;
+    pausedByDark = false;
   }
 
   if (unpauseRequested) 
   {
     isPaused = false;
     unpauseRequested = false;
+    pausedByDark = false;
   }
   if (resetRequested) 
   {
   resetRequested = false;
+  pausedByDark = false;
   resetGame();
   }
 
-  // Main game loop with delay
   unsigned long currentMillis = millis();
   if (!isPaused && currentMillis - previousMillis > (gameDelay / level)) {
 
@@ -242,7 +264,7 @@ void loop() {
     previousMillis = currentMillis;
   }
 
-  // Draw to LCD
+  //
   u8g2.firstPage();
   do {
     if (isPaused) {
@@ -798,11 +820,33 @@ unsigned int adc_read(unsigned char adc_channel_num) {
   *my_ADCSRB &= 0b01111111;
  
   // set the channel selection bits for channel
-  *my_ADCSRB |= (0b01000000);
-  for (int i = 0; i < adc_channel_num; i++) {
-    *my_ADCSRB += 0b00000001;
+  switch (adc_channel_num){
+    case 0:
+      *my_ADCSRB |= (0b01000000);
+      break;
+    case 1:
+      *my_ADCSRB |= (0b01000001);
+      break;
+    case 2:
+      *my_ADCSRB |= (0b01000010);
+      break;
+    case 3:
+      *my_ADCSRB |= (0b01000011);
+      break;
+    case 4:
+      *my_ADCSRB |= (0b01000100);
+      break;
+    case 5:
+      *my_ADCSRB |= (0b01000101);
+      break;
+    case 6:
+      *my_ADCSRB |= (0b01000110);
+      break;
+    case 7:
+      *my_ADCSRB |= (0b01000111);
+      break;
+    
   }
-
 
   // set bit 6 of ADCSRA to 1 to start a conversion
   *my_ADCSRA |= 0b01000000;
