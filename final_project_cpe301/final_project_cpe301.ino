@@ -161,6 +161,8 @@ unsigned int currentNote = 0;
 unsigned int gameDelay = 600;
 unsigned int totalRowsCleared = 0;
 unsigned int level = 1;
+const int center = 512;
+const int threshold = 100;
 
 void setup() {
   pinMode(LEFT_BUTTON_PIN, INPUT);
@@ -225,19 +227,24 @@ void loop() {
   resetGame();
   }
 
+
+  // Main game loop with delay
   unsigned long currentMillis = millis();
+  //game controls
+  unsigned int joystickX = adc_read(15); 
+  unsigned int joystickY = adc_read(14); 
   if (!isPaused && currentMillis - previousMillis > (gameDelay / level)) {
 
-    if (digitalRead(LEFT_BUTTON_PIN) == HIGH && canMoveLeft(grid, block)) {
+    if ((int)joystickX < (center - threshold) && canMoveLeft(grid, block)) {
       block = translateBlock(grid, block, -1, 0);
     }
-    else if (digitalRead(RIGHT_BUTTON_PIN) == HIGH && canMoveRight(grid, block)) {
+    else if ((int)joystickX > (center + threshold) && canMoveRight(grid, block)) {
       block = translateBlock(grid, block, 1, 0);
     }
-    else if (digitalRead(ROTATE_BUTTON_PIN) == HIGH && canRotate(grid, block)) {
+    if ((int)joystickY < (center - threshold) && canRotate(grid, block)) {
       block = rotateBlock(grid, block);
     }
-    else if (digitalRead(DROP_BUTTON_PIN) == HIGH) {
+    if ((int)joystickY > (center + threshold)) {
       block = dropBlock(grid, block);
       blockMoves++;
     }
