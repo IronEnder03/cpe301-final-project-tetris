@@ -162,13 +162,9 @@ unsigned int gameDelay = 600;
 unsigned int totalRowsCleared = 0;
 unsigned int level = 1;
 const int center = 512;
-const int threshold = 100;
-
+const int thresholdx = 75;
+const int thresholdy = 150;
 void setup() {
-  pinMode(LEFT_BUTTON_PIN, INPUT);
-  pinMode(RIGHT_BUTTON_PIN, INPUT);
-  pinMode(ROTATE_BUTTON_PIN, INPUT);
-  pinMode(DROP_BUTTON_PIN, INPUT);
 
   *portDDRB |= (1 << 6);  // Same as 0x40
 
@@ -235,16 +231,16 @@ void loop() {
   unsigned int joystickY = adc_read(14); 
   if (!isPaused && currentMillis - previousMillis > (gameDelay / level)) {
 
-    if ((int)joystickX < (center - threshold) && canMoveLeft(grid, block)) {
+    if ((int)joystickX < (center - thresholdx) && canMoveLeft(grid, block)) {
       block = translateBlock(grid, block, -1, 0);
     }
-    else if ((int)joystickX > (center + threshold) && canMoveRight(grid, block)) {
+    else if ((int)joystickX > (center + thresholdx) && canMoveRight(grid, block)) {
       block = translateBlock(grid, block, 1, 0);
     }
-    if ((int)joystickY < (center - threshold) && canRotate(grid, block)) {
+    if ((int)joystickY < (center - thresholdy) && canRotate(grid, block)) {
       block = rotateBlock(grid, block);
     }
-    if ((int)joystickY > (center + threshold)) {
+    if ((int)joystickY > (center + thresholdy)) {
       block = dropBlock(grid, block);
       blockMoves++;
     }
