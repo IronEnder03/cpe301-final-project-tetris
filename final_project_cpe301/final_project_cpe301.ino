@@ -194,7 +194,6 @@ bool pausedByDark = false;
 void loop() {
 
   unsigned int sensor_value = adc_read(1);
-  Serial.println(sensor_value);
   bool isDark = (sensor_value < darknessThreshold);
 
   if (isDark && !isPaused) 
