@@ -193,7 +193,7 @@ bool pausedByDark = false;
 
 void loop() {
 
-  unsigned int sensor_value = adc_read(1);
+  unsigned int sensor_value = adc_read(8);
   Serial.println(sensor_value);
   bool isDark = (sensor_value < darknessThreshold);
 
@@ -814,38 +814,47 @@ void adc_init() {
 unsigned int adc_read(unsigned char adc_channel_num) {
   // clear the channel selection bits (MUX 4:0)
   *my_ADMUX &= 0b11100000;
- 
 
   // clear the channel selection bits (MUX 5) hint: it's not in the ADMUX register
-  *my_ADCSRB &= 0b01111111;
+  *my_ADCSRB &= 0b01110111;
+
+  if (adc_channel_num > 7)
+    *my_ADCSRB |= 0b00001000;
  
   // set the channel selection bits for channel
   switch (adc_channel_num){
     case 0:
-      *my_ADCSRB |= (0b01000000);
+    case 8:
+      *my_ADMUX |= 0b01000000;
       break;
     case 1:
-      *my_ADCSRB |= (0b01000001);
+    case 9:
+      *my_ADMUX |= 0b01000001;
       break;
     case 2:
-      *my_ADCSRB |= (0b01000010);
+    case 10:
+      *my_ADMUX |= 0b01000010;
       break;
     case 3:
-      *my_ADCSRB |= (0b01000011);
+    case 11:
+      *my_ADMUX |= 0b01000011;
       break;
     case 4:
-      *my_ADCSRB |= (0b01000100);
+    case 12:
+      *my_ADMUX |= 0b01000100;
       break;
     case 5:
-      *my_ADCSRB |= (0b01000101);
+    case 13:
+      *my_ADMUX |= 0b01000101;
       break;
     case 6:
-      *my_ADCSRB |= (0b01000110);
+    case 14:
+      *my_ADMUX |= 0b01000110;
       break;
     case 7:
-      *my_ADCSRB |= (0b01000111);
+    case 15:
+      *my_ADMUX |= 0b01000111;
       break;
-    
   }
 
   // set bit 6 of ADCSRA to 1 to start a conversion
