@@ -3,6 +3,7 @@
 // Description: Final project code for CPE 301
 
 #include <U8g2lib.h>
+#include <RTClib.h>
 
 // Pins
 #define LEFT_BUTTON_PIN 53
@@ -164,6 +165,14 @@ unsigned int level = 1;
 const int center = 512;
 const int thresholdx = 75;
 const int thresholdy = 150;
+
+RTC_DS1307 clock;
+
+unsigned int hours = 0;
+unsigned int minutes = 0;
+unsigned int seconds = 0;
+unsigned int halfOfDay = 0;
+
 void setup() {
 
   *portDDRB |= (1 << 6);  // Same as 0x40
@@ -185,6 +194,9 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(PAUSE_BUTTON_PIN), pauseISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(UNPAUSE_BUTTON_PIN), unpauseISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(RESET_BUTTON_PIN), resetISR, FALLING);
+
+  clock.begin();
+  clock.adjust(DateTime(F(__DATE__), F(__TIME__)));
 }
 
 bool pausedByDark = false;
@@ -271,7 +283,30 @@ void loop() {
   do {
     if (isPaused) {
       u8g2.setFont(u8g2_font_bpixel_tr);
-      u8g2.drawStr(20, 30, "PAUSED");
+      u8g2.drawStr(15, 30, "PAUSED");
+      DateTime current = clock.now();
+      hours = current.hour();
+      // determine if am or pm and convert to standard time
+      if(hours > 12){
+        halfOfDay = 1;
+        hours = hours - 12;
+      }
+      else if(hours < 12){
+        halfOfDay = 0;
+      }
+      else{
+        halfOfDay = 1;
+      }
+      minutes = current.minute();
+      seconds = current.second();
+      u8g2.drawStr(15, 40, String(String(hours) + ":" + String(minutes) + ":" + String(seconds)).c_str());
+      // indicate am or pm
+      if (halfOfDay == 0) {
+        u8g2.drawStr(45, 40, "am");
+      }
+      else {
+        u8g2.drawStr(45, 40, "am");
+      }
     } else {
       // Draw borders
       u8g2.drawBox(0, 0, 2, 128);
