@@ -300,6 +300,9 @@ void loop() {
       block = BLOCKS[random(0, 7)];
       block = insertBlock(grid, block);
       blockMoves = 0;
+      if (getScore(rowsCleared) != 0) {
+        displayInfo();
+      }
     }
 
     previousMillis = currentMillis;
@@ -398,7 +401,6 @@ void loop() {
   } else {
     *portA |= 0x02;
   }
-  displayInfo();
 }
 
 Vector transformVector(Matrix mat, Vector vec) {
@@ -1069,5 +1071,36 @@ void displayInfo() {
     U0putchar(displayLevel[i]);
   }
 
+  U0putchar('\n');
+
+  DateTime current = clock.now();
+  hours = current.hour();
+  // determine if am or pm and convert to standard time
+  if(hours > 12){
+    halfOfDay = 1;
+    hours = hours - 12;
+  }
+  else if(hours < 12){
+    halfOfDay = 0;
+  }
+  else{
+    halfOfDay = 1;
+  }
+  minutes = current.minute();
+  seconds = current.second();
+  for (int i = 0; i < String(String(hours) + ":" + String(minutes) + ":" + String(seconds)).length(); i++) {
+    U0putchar(String(String(hours) + ":" + String(minutes) + ":" + String(seconds)).c_str()[i]);
+  }
+  // indicate am or pm
+  if (halfOfDay == 0) {
+    U0putchar(' ');
+    U0putchar('a');
+    U0putchar('m');
+  }
+  else {
+    U0putchar(' ');
+    U0putchar('a');
+    U0putchar('m');
+  }
   U0putchar('\n');
 }
