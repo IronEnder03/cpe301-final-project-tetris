@@ -6,19 +6,17 @@
 #include <RTClib.h>
 
 // Pins
-#define LEFT_BUTTON_PIN 53
-#define RIGHT_BUTTON_PIN 51
-#define ROTATE_BUTTON_PIN 49
-#define DROP_BUTTON_PIN 47
 
-#define PAUSE_BUTTON_PIN    0x02 //2
-#define UNPAUSE_BUTTON_PIN  0x03 //Pin 3
-#define RESET_BUTTON_PIN    0x13 //Pin 19
+#define PAUSE_BUTTON_PIN    0x02 // 2
+#define UNPAUSE_BUTTON_PIN  0x03 // Pin 3
+#define RESET_BUTTON_PIN    0x13 // Pin 19
+#define MUTE_BUTTON_PIN     0x12 // Pin 18
 
 
 #define PAUSE_BUTTON_BIT    (1 << 2)
 #define UNPAUSE_BUTTON_BIT  (1 << 3) 
-#define RESET_BUTTON_BIT    (1 << 2) 
+#define RESET_BUTTON_BIT    (1 << 2)
+#define MUTE_BUTTON_BIT     (1 << 3)
 
 
 volatile bool isPaused = false;
@@ -26,6 +24,8 @@ volatile bool pauseRequested = false;
 volatile bool unpauseRequested = false;
 volatile bool resetRequested = false;
 unsigned int darknessThreshold = 200;
+volatile bool isMuted = false;
+volatile bool muteRequested = false;
 
 // Registers
 
@@ -124,10 +124,17 @@ void U0init(int U0baud);
 unsigned char U0kbhit();
 unsigned char U0getchar();
 void U0putchar(unsigned char U0pdata);
+void displayInfo();
 
 // ADC functions
 void adc_init();
 unsigned int adc_read(unsigned char adc_channel_num);
+
+// ISR functions
+void pauseISR();
+void unpauseISR();
+void resetISR();
+void muteISR();
 
 const TetrisBlock BLOCKS[7] = {TETRIS_BLOCK1, TETRIS_BLOCK2, TETRIS_BLOCK3, TETRIS_BLOCK4, TETRIS_BLOCK5, TETRIS_BLOCK6, TETRIS_BLOCK7};
 
@@ -185,15 +192,16 @@ void setup() {
   block = BLOCKS[random(0, 7)];
   block = insertBlock(grid, block);
 
-  *portDDRD &= ~(PAUSE_BUTTON_BIT | UNPAUSE_BUTTON_BIT);
+  *portDDRD &= ~(PAUSE_BUTTON_BIT | UNPAUSE_BUTTON_BIT | MUTE_BUTTON_BIT);
   *portDDRE &= ~(RESET_BUTTON_BIT);                 
 
-  *portD |= (PAUSE_BUTTON_BIT | UNPAUSE_BUTTON_BIT);
+  *portD |= (PAUSE_BUTTON_BIT | UNPAUSE_BUTTON_BIT | MUTE_BUTTON_BIT);
   *portE |= (RESET_BUTTON_BIT);
 
   attachInterrupt(digitalPinToInterrupt(PAUSE_BUTTON_PIN), pauseISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(UNPAUSE_BUTTON_PIN), unpauseISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(RESET_BUTTON_PIN), resetISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(MUTE_BUTTON_PIN), muteISR, FALLING);
 
   clock.begin();
   clock.adjust(DateTime(F(__DATE__), F(__TIME__)));
@@ -234,6 +242,11 @@ void loop() {
   pausedByDark = false;
   resetGame();
   }
+  if (muteRequested)
+  {
+    muteRequested = false;
+    isMuted = !isMuted;
+  }
 
 
   // Main game loop with delay
@@ -266,7 +279,7 @@ void loop() {
     } else {
       int rowsCleared = clearRows(grid, block);
       totalRowsCleared += rowsCleared;
-      if (rowsCleared != 0 && totalRowsCleared % 2 == 0) {
+      if (rowsCleared != 0 && totalRowsCleared % 4 == 0) {
         level += 1;
       }
       score += getScore(rowsCleared);
@@ -305,7 +318,7 @@ void loop() {
         u8g2.drawStr(45, 40, "am");
       }
       else {
-        u8g2.drawStr(45, 40, "am");
+        u8g2.drawStr(45, 40, "pm");
       }
     } else {
       // Draw borders
@@ -331,12 +344,39 @@ void loop() {
       u8g2.setFont(u8g2_font_squeezed_b6_tr);
       char scoreStr[10];
       itoa(score, scoreStr, 10);
+      char rowsClearedStr[4];
+      itoa(totalRowsCleared, rowsClearedStr, 4);
       u8g2.drawStr(5, 40, "Score:");
       u8g2.drawStr(38, 40, scoreStr);
+      u8g2.drawStr(5, 50, "Rows:");
+      u8g2.drawStr(38, 50, rowsClearedStr);
+      DateTime current = clock.now();
+      hours = current.hour();
+      // determine if am or pm and convert to standard time
+      if(hours > 12){
+        halfOfDay = 1;
+        hours = hours - 12;
+      }
+      else if(hours < 12){
+        halfOfDay = 0;
+      }
+      else{
+        halfOfDay = 1;
+      }
+      minutes = current.minute();
+      seconds = current.second();
+      u8g2.drawStr(5, 60, String(String(hours) + ":" + String(minutes) + ":" + String(seconds)).c_str());
+      // indicate am or pm
+      if (halfOfDay == 0) {
+        u8g2.drawStr(40, 60, "am");
+      }
+      else {
+        u8g2.drawStr(40, 60, "pm");
+      }
     }
   } while (u8g2.nextPage());
 
-  if (!isPaused && !gameOver) {
+  if (!isPaused && !gameOver && !isMuted) {
     playTetrisTheme();
   }
 }
@@ -930,4 +970,12 @@ void unpauseISR()
 void resetISR() 
 {
   resetRequested = true;
+}
+void muteISR()
+{
+  muteRequested = true;
+}
+
+void displayInfo() {
+  
 }
