@@ -232,10 +232,14 @@ void loop() {
   {
     isPaused = true;
     pausedByDark = true;
+    *portA |= 0x04;
+    *portA &= ~(0x01);
   }else if(!isDark && pausedByDark) 
   {
     isPaused = false;
     pausedByDark = false;
+    *portA &= ~(0x04);
+    *portA |= 0x01;
   }
   if (pauseRequested) 
   {
@@ -293,7 +297,7 @@ void loop() {
     } else {
       int rowsCleared = clearRows(grid, block);
       totalRowsCleared += rowsCleared;
-      if (rowsCleared != 0 && totalRowsCleared % 4 == 0) {
+      if (rowsCleared != 0 && (totalRowsCleared / level) >= 4) {
         level += 1;
       }
       score += getScore(rowsCleared);
@@ -1099,7 +1103,7 @@ void displayInfo() {
   }
   else {
     U0putchar(' ');
-    U0putchar('a');
+    U0putchar('p');
     U0putchar('m');
   }
   U0putchar('\n');
