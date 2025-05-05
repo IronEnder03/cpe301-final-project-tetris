@@ -23,7 +23,7 @@ volatile bool isPaused = false;
 volatile bool pauseRequested = false;
 volatile bool unpauseRequested = false;
 volatile bool resetRequested = false;
-unsigned int darknessThreshold = 200;
+unsigned int darknessThreshold = 300;
 volatile bool isMuted = false;
 volatile bool muteRequested = false;
 
@@ -312,7 +312,7 @@ void loop() {
       }
       minutes = current.minute();
       seconds = current.second();
-      u8g2.drawStr(15, 40, String(String(hours) + ":" + String(minutes) + ":" + String(seconds)).c_str());
+      u8g2.drawStr(5, 40, String(String(hours) + ":" + String(minutes) + ":" + String(seconds)).c_str());
       // indicate am or pm
       if (halfOfDay == 0) {
         u8g2.drawStr(45, 40, "am");
@@ -345,7 +345,7 @@ void loop() {
       char scoreStr[10];
       itoa(score, scoreStr, 10);
       char rowsClearedStr[4];
-      itoa(totalRowsCleared, rowsClearedStr, 4);
+      itoa(totalRowsCleared, rowsClearedStr, 10);
       u8g2.drawStr(5, 40, "Score:");
       u8g2.drawStr(38, 40, scoreStr);
       u8g2.drawStr(5, 50, "Rows:");
@@ -379,6 +379,7 @@ void loop() {
   if (!isPaused && !gameOver && !isMuted) {
     playTetrisTheme();
   }
+  displayInfo();
 }
 
 Vector transformVector(Matrix mat, Vector vec) {
@@ -977,5 +978,67 @@ void muteISR()
 }
 
 void displayInfo() {
-  
+
+  char displayScore[10];
+  itoa(score, displayScore, 10);
+
+  U0putchar('S');
+  U0putchar('c');
+  U0putchar('o');
+  U0putchar('r');
+  U0putchar('e');
+  U0putchar(':');
+
+  if (score > 0) {
+    for (int i = 0; i < floor(log10(score) + 1); i++) {
+      U0putchar(displayScore[i]);
+    }
+  } else {
+    U0putchar('0');
+  }
+
+  U0putchar('\n');
+
+  char displayRowsCleared[4];
+  itoa(totalRowsCleared, displayRowsCleared, 10);
+
+  U0putchar('R');
+  U0putchar('o');
+  U0putchar('w');
+  U0putchar('s');
+  U0putchar(' ');
+  U0putchar('C');
+  U0putchar('l');
+  U0putchar('e');
+  U0putchar('a');
+  U0putchar('r');
+  U0putchar('e');
+  U0putchar('d');
+  U0putchar(':');
+
+  if (totalRowsCleared > 0) {
+    for (int i = 0; i < floor(log10(totalRowsCleared) + 1); i++) {
+      U0putchar(displayRowsCleared[i]);
+    }
+  } else {
+    U0putchar('0');
+  }
+
+  U0putchar('\n');
+
+  char displayLevel[3];
+  itoa(level, displayLevel, 10);
+
+  U0putchar('L');
+  U0putchar('e');
+  U0putchar('v');
+  U0putchar('e');
+  U0putchar('l');
+  U0putchar(':');
+
+  for (int i = 0; i < floor(log10(level) + 1); i++) {
+    U0putchar(displayLevel[i]);
+  }
+
+  U0putchar('\n');
 }
