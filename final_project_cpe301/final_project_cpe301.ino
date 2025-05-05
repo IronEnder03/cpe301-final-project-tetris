@@ -13,10 +13,13 @@
 #define MUTE_BUTTON_PIN     0x12 // Pin 18
 
 
+
 #define PAUSE_BUTTON_BIT    (1 << 2)
 #define UNPAUSE_BUTTON_BIT  (1 << 3) 
 #define RESET_BUTTON_BIT    (1 << 2)
 #define MUTE_BUTTON_BIT     (1 << 3)
+
+
 
 
 volatile bool isPaused = false;
@@ -41,6 +44,10 @@ volatile unsigned char *pinE     = (unsigned char *) 0x2C;
 volatile unsigned char *portDDRB = (unsigned char *) 0x24;
 volatile unsigned char *portB    = (unsigned char *) 0x25;
 volatile unsigned char *pinB     = (unsigned char *) 0x23;
+
+volatile unsigned char *portDDRA = (unsigned char *) 0x21;
+volatile unsigned char *portA    = (unsigned char *) 0x22;
+volatile unsigned char *pinA   = (unsigned char *) 0x20;
 
 // Timer Registers
 volatile unsigned char *myTCCR1A = (unsigned char *) 0x80;
@@ -183,6 +190,10 @@ unsigned int halfOfDay = 0;
 void setup() {
 
   *portDDRB |= (1 << 6);  // Same as 0x40
+  *portDDRA |= 0x01;
+  *portDDRA |= 0x02;
+  *portDDRA |= 0x04;
+  *portDDRA |= 0x08;
 
   u8g2.begin();
   U0init(9600);
@@ -198,6 +209,8 @@ void setup() {
   *portD |= (PAUSE_BUTTON_BIT | UNPAUSE_BUTTON_BIT | MUTE_BUTTON_BIT);
   *portE |= (RESET_BUTTON_BIT);
 
+  *portA |= 0x01;
+
   attachInterrupt(digitalPinToInterrupt(PAUSE_BUTTON_PIN), pauseISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(UNPAUSE_BUTTON_PIN), unpauseISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(RESET_BUTTON_PIN), resetISR, FALLING);
@@ -210,6 +223,7 @@ void setup() {
 bool pausedByDark = false;
 
 void loop() {
+
 
   unsigned int sensor_value = adc_read(1);
   bool isDark = (sensor_value < darknessThreshold);
@@ -338,6 +352,8 @@ void loop() {
     }
 
     if (gameOver) {
+      *portA |= 0x08;
+      *portA &= ~(0x01);
       clearGrid(grid);
       u8g2.setFont(u8g2_font_bpixel_tr);
       u8g2.drawStr(5, 30, "Game Over!");
@@ -378,6 +394,9 @@ void loop() {
 
   if (!isPaused && !gameOver && !isMuted) {
     playTetrisTheme();
+    *portA &= ~(0x02);
+  } else {
+    *portA |= 0x02;
   }
   displayInfo();
 }
@@ -956,17 +975,27 @@ void resetGame()
   score = 0;
   gameOver = false;
   isPaused = false;
+  isMuted = false;
+  *portA &= ~(0x08);
+  *portA |= 0x01;
+  *portA &= ~(0x04);
+  *portA &= ~(0x02);
   previousMillis = millis(); 
 }
 
 void pauseISR() 
 {
   pauseRequested = true;
+  *portA |= 0x04;
+  *portA &= ~(0x01);
 }
 
 void unpauseISR() 
 {
   unpauseRequested = true;
+  *portA &= ~(0x04);
+  *portA |= 0x01;
+
 }
 void resetISR() 
 {
